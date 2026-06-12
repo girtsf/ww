@@ -61,6 +61,32 @@ func TestServeFileAndDir(t *testing.T) {
 	}
 }
 
+// TestServeIndexHTML: a directory holding an index.html serves that file
+// instead of the generated listing; directories without one still list.
+func TestServeIndexHTML(t *testing.T) {
+	s, root := newServer(t)
+	mustWrite(t, filepath.Join(root, "index.html"), "<h1>home</h1>")
+	mustWrite(t, filepath.Join(root, "other.txt"), "other")
+
+	if code, body := get(s, "/"); code != 200 || body != "<h1>home</h1>" {
+		t.Errorf("/ = %d %q, want 200 index.html content", code, body)
+	}
+
+	// A subdirectory index.html is served too.
+	mustMkdir(t, filepath.Join(root, "sub"))
+	mustWrite(t, filepath.Join(root, "sub", "index.html"), "<h1>sub</h1>")
+	if code, body := get(s, "/sub/"); code != 200 || body != "<h1>sub</h1>" {
+		t.Errorf("/sub/ = %d %q, want 200 sub index", code, body)
+	}
+
+	// A directory without an index.html still produces a listing.
+	mustMkdir(t, filepath.Join(root, "bare"))
+	mustWrite(t, filepath.Join(root, "bare", "x.txt"), "x")
+	if code, body := get(s, "/bare/"); code != 200 || !strings.Contains(body, "x.txt") {
+		t.Errorf("/bare/ = %d, want listing with x.txt", code)
+	}
+}
+
 // TestTraversal: no amount of ".." in the URL path may escape the root.
 func TestTraversal(t *testing.T) {
 	s, root := newServer(t)

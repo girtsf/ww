@@ -291,6 +291,15 @@ func (s *server) serveDir(w http.ResponseWriter, r *http.Request, dir, urlPath s
 		return
 	}
 
+	// If the directory contains an index.html, serve it instead of a listing.
+	// Resolve symlinks and re-check containment, matching ServeHTTP's model.
+	if real, err := filepath.EvalSymlinks(filepath.Join(dir, "index.html")); err == nil && withinRoot(s.root, real) {
+		if info, err := os.Stat(real); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, real)
+			return
+		}
+	}
+
 	f, err := os.Open(dir)
 	if err != nil {
 		http.Error(w, "500 internal error", http.StatusInternalServerError)
