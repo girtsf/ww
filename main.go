@@ -41,6 +41,7 @@ func run() error {
 		listenFlag  = flag.String("listen", "localhost", "IP/host to listen on")
 		urlHostFlag = flag.String("url-host", "localhost", "host name shown in the printed URL")
 		timeoutFlag = flag.String("timeout", "", `idle shutdown after no retrievals (e.g. "10m", "1h 5m", "30s"); default 10m`)
+		dirFlag     = flag.String("dir", "", "directory to serve (default: current directory)")
 	)
 	flag.Parse()
 
@@ -54,14 +55,24 @@ func run() error {
 	}
 
 	// Resolve the serving root, following any symlinks so later
-	// containment checks compare against the real path.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
+	// containment checks compare against the real path. Defaults to the
+	// current directory; -dir overrides it.
+	base := *dirFlag
+	if base == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		base = cwd
 	}
-	root, err := filepath.EvalSymlinks(cwd)
+	root, err := filepath.EvalSymlinks(base)
 	if err != nil {
-		return fmt.Errorf("resolving working directory: %w", err)
+		return fmt.Errorf("resolving served directory %q: %w", base, err)
+	}
+	if info, err := os.Stat(root); err != nil {
+		return err
+	} else if !info.IsDir() {
+		return fmt.Errorf("not a directory: %q", base)
 	}
 
 	ln, port, err := listen(*listenFlag, *portFlag)
