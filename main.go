@@ -37,16 +37,25 @@ func main() {
 
 func run() error {
 	var (
-		portFlag    = flag.Int("port", 0, "port to listen on (default: random free port in 5001-5999)")
-		listenFlag  = flag.String("listen", "localhost", "IP/host to listen on")
-		urlHostFlag = flag.String("url-host", "localhost", "host name shown in the printed URL")
-		timeoutFlag = flag.String("timeout", "", `idle shutdown after no retrievals (e.g. "10m", "1h 5m", "30s"); default 10m`)
-		dirFlag     = flag.String("dir", "", "directory to serve (default: current directory)")
+		portFlag      = flag.Int("port", 0, "port to listen on (default: random free port in 5001-5999)")
+		listenFlag    = flag.String("listen", "localhost", "IP/host to listen on")
+		urlHostFlag   = flag.String("url-host", "localhost", "host name shown in the printed URL")
+		timeoutFlag   = flag.String("timeout", "", `idle shutdown after no retrievals (e.g. "10m", "1h 5m", "30s"); default 10m`)
+		noTimeoutFlag = flag.Bool("no-timeout", false, "never shut down on idle (overrides -timeout)")
+		dirFlag       = flag.String("dir", "", "directory to serve (default: current directory)")
 	)
 	flag.Parse()
 
+	if *noTimeoutFlag && *timeoutFlag != "" {
+		return errors.New("-no-timeout and -timeout are mutually exclusive")
+	}
+
+	// A zero timeout disables idle shutdown entirely.
 	timeout := defaultTimeout
-	if *timeoutFlag != "" {
+	switch {
+	case *noTimeoutFlag:
+		timeout = 0
+	case *timeoutFlag != "":
 		t, err := parseTimeout(*timeoutFlag)
 		if err != nil {
 			return err
@@ -105,7 +114,9 @@ func run() error {
 
 	fmt.Printf("Serving %s\n", root)
 	fmt.Printf("  http://%s:%d/\n", *urlHostFlag, port)
-	fmt.Printf("  (quits after %s of inactivity)\n", timeout)
+	if timeout > 0 {
+		fmt.Printf("  (quits after %s of inactivity)\n", timeout)
+	}
 
 	idle.start()
 	if err := httpSrv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -154,6 +165,9 @@ func newIdleTimer(timeout time.Duration) *idleTimer {
 }
 
 func (t *idleTimer) start() {
+	if t.timeout <= 0 {
+		return
+	}
 	t.timer = time.AfterFunc(t.timeout, func() {
 		close(t.fired)
 	})
