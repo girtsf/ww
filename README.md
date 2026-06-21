@@ -38,3 +38,9 @@ served instead of a listing.
 | `-dir`        | Directory to serve (default: current directory)                              |
 | `-timeout`    | Idle shutdown after no retrievals, e.g. `10m`, `1h 5m`, `30s` (default: 10m) |
 | `-no-timeout` | Never shut down on idle                                                      |
+
+## Claude Code skill
+
+[`skill/`](skill/) is a Claude Code skill that writes an answer as a
+self-contained HTML page and serves it with `ww`. Install it by copying or
+symlinking the directory to `~/.claude/skills/ww`.
